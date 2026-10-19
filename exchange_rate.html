@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Курси валют</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="index.html">Про автора</a>
+            <a href="exchange_rate.html" class="active">Курси валют</a>
+            <a href="team.html">Моя команда</a>
+        </nav>
+    </header>
+
+    <h1>Курси валют</h1>
+
+    <table id="rates">
+        <tr><td>Завантаження...</td></tr>
+    </table>
+
+    <script>
+        var currencies = { UAH: 980, USD: 840, EUR: 978, SEK: 752, MXN: 484, ZAR: 710 };
+        var table = document.getElementById('rates');
+
+        var saved = JSON.parse(localStorage.getItem('rates') || 'null');
+
+        if (saved && Date.now() - saved.time < 5 * 60 * 1000) {
+            render(saved.data);
+        } else {
+            fetch('https://api.monobank.ua/bank/currency')
+                .then(function (response) {
+                    if (!response.ok) throw new Error(response.status);
+                    return response.json();
+                })
+                .then(function (data) {
+                    localStorage.setItem('rates', JSON.stringify({ time: Date.now(), data: data }));
+                    render(data);
+                })
+                .catch(function () {
+                    if (saved) {
+                        render(saved.data);
+                    } else {
+                        table.innerHTML = '<tr><td>Не вдалося завантажити курси, спробуйте пізніше</td></tr>';
+                    }
+                });
+        }
+
+        function render(data) {
+            var buy = { UAH: 1 };
+            var sell = { UAH: 1 };
+            for (var code in currencies) {
+                data.forEach(function (item) {
+                    if (item.currencyCodeA === currencies[code] && item.currencyCodeB === 980) {
+                        buy[code] = item.rateBuy || item.rateCross;
+                        sell[code] = item.rateSell || item.rateCross;
+                    }
+                });
+            }
+
+            var codes = Object.keys(currencies);
+            var date = new Date().toLocaleDateString('uk-UA');
+
+            var html = '<tr><th colspan="2" rowspan="2"></th>'
+                + '<th colspan="' + codes.length + '">Купівля ' + date + '</th></tr><tr>';
+            codes.forEach(function (code) { html += '<th>' + code + '</th>'; });
+            html += '</tr>';
+
+            codes.forEach(function (row, i) {
+                html += '<tr>';
+                if (i === 0) {
+                    html += '<th rowspan="' + codes.length + '">Продаж ' + date + '</th>';
+                }
+                html += '<th>' + row + '</th>';
+                codes.forEach(function (col) {
+                    var value = row === col ? 1 : buy[col] / sell[row];
+                    html += '<td>' + Number(value.toFixed(4)) + '</td>';
+                });
+                html += '</tr>';
+            });
+
+            table.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
